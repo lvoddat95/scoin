@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tra Cứu Tiền Điện Tử</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #refreshBtn:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        /* Styles for Modal */
+        .modal-overlay {
+            transition: opacity 0.2s ease-in-out;
+        }
+        .modal-container {
+            transition: transform 0.2s ease-in-out;
+        }
+        .price-up {
+            color: #16a34a; /* green-600 */
+        }
+        .price-down {
+            color: #dc2626; /* red-600 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+
+    <div class="container mx-auto p-4 sm:p-6 md:p-8 max-w-2xl">
+        <h1 class="text-3xl sm:text-4xl font-bold text-center mb-6 text-gray-900 dark:text-white">Tra Cứu Tiền Điện Tử</h1>
+
+        <!-- Search Input and Container -->
+        <div class="flex items-start space-x-2">
+            <div class="relative flex-grow" id="search-container">
+                <div class="relative">
+                     <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Nhập tên hoặc ký hiệu (ví dụ: BTC, Bitcoin)" 
+                        class="w-full px-4 py-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 transition-shadow duration-200"
+                    >
+                    <div id="loading-spinner" class="absolute top-1/2 right-3 transform -translate-y-1/2 hidden">
+                        <svg class="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+                </div>
+               
+                <!-- Results Dropdown -->
+                <div id="results" class="absolute z-10 w-full mt-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-80 overflow-y-auto hidden">
+                    <!-- Results will be injected here -->
+                </div>
+            </div>
+            <button id="refreshBtn" title="Tải dữ liệu mới" class="p-3 bg-blue-500 text-white rounded-lg shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors h-[50px]">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5m7 10v-5h-5m-2-1.5a9 9 0 1111-5.5M4 14.5A9 9 0 0012 20.5c4.142 0 7.6-3 8.5-7"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="status-message" class="text-center text-sm text-gray-500 dark:text-gray-400 h-5 mt-2"></div>
+    </div>
+
+    <!-- Exchange Modal -->
+    <div id="exchangeModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+        <!-- Overlay -->
+        <div class="modal-overlay fixed inset-0 bg-black bg-opacity-50" id="modalOverlay"></div>
+        
+        <!-- Modal Content -->
+        <div class="modal-container bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] transform scale-95 z-10">
+            <div class="flex justify-between items-center p-4 border-b dark:border-gray-700">
+                <h2 id="modalTitle" class="text-xl font-semibold text-gray-900 dark:text-white"></h2>
+                <button id="closeModalBtn" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="modalBody" class="p-4 overflow-y-auto max-h-[calc(80vh-120px)]">
+                <!-- Exchange and Funding Rate data will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // DOM Elements
+        const searchInput = document.getElementById('searchInput');
+        const resultsContainer = document.getElementById('results');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const searchContainer = document.getElementById('search-container');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const statusMessage = document.getElementById('status-message');
+        const exchangeModal = document.getElementById('exchangeModal');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+
+
+        // API and Constants
+        const API_DATA_LIST_URL = 'https://dncapi.flink1.com/api/v2/coin/data_list?webp=1';
+        const API_MARKET_TICKER_URL = 'https://dncapi.flink1.com/api/v2/Coin/market_ticker?tickertype=1&webp=1';
+        const API_BINANCE_FUNDING_RATE_URL = 'https://fapi.binance.com/fapi/v1/fundingRate'; // FIXED: Use official, public API
+        const IMAGE_BASE_URL = 'https://s2.flink1.com/cdn-cgi/image/width=40,quality=75/logo/1/';
+        const CACHE_KEY = 'cryptoApiCache';
+        const MAX_RESULTS = 100;
+        
+        let cryptoData = [];
+        
+        // --- Data Fetching and Caching ---
+        async function refreshData() {
+            loadingSpinner.classList.remove('hidden');
+            refreshBtn.disabled = true;
+            statusMessage.textContent = 'Đang tải dữ liệu mới...';
+            try {
+                const response = await fetch(API_DATA_LIST_URL);
+                if (!response.ok) throw new Error(`Lỗi mạng: ${response.status}`);
+                const data = await response.json();
+
+                const processedData = data.data
+                    .filter(item => item[1] && item[3] && item[4] === '1')
+                    .map(item => ({
+                        code: item[1], // Use item[1] as the unique code
+                        symbol: item[3],
+                        imageUrl: `${IMAGE_BASE_URL}${item[5]}`
+                    }));
+                
+                localStorage.setItem(CACHE_KEY, JSON.stringify(processedData));
+                cryptoData = processedData;
+                statusMessage.textContent = 'Dữ liệu đã được cập nhật thành công!';
+            } catch (error) {
+                console.error("Không thể lấy dữ liệu tiền điện tử:", error);
+                statusMessage.textContent = 'Lỗi khi cập nhật dữ liệu.';
+            } finally {
+                setTimeout(() => statusMessage.textContent = '', 3000);
+                loadingSpinner.classList.add('hidden');
+                refreshBtn.disabled = false;
+            }
+        }
+
+        function initializeApp() {
+            const cachedData = localStorage.getItem(CACHE_KEY);
+            if (cachedData) {
+                try {
+                    cryptoData = JSON.parse(cachedData);
+                    statusMessage.textContent = 'Đã tải dữ liệu từ bộ nhớ đệm.';
+                    setTimeout(() => statusMessage.textContent = '', 3000);
+                } catch(e) {
+                    console.error("Lỗi phân tích dữ liệu cache:", e);
+                    refreshData();
+                }
+            } else {
+                refreshData();
+            }
+        }
+
+        // --- Search UI Logic ---
+        function displayResults(filteredData) {
+            resultsContainer.innerHTML = '';
+            const dataToShow = filteredData.slice(0, MAX_RESULTS);
+
+            if (dataToShow.length === 0) {
+                resultsContainer.innerHTML = `<div class="p-4 text-center text-gray-500">Không tìm thấy kết quả.</div>`;
+            } else {
+                dataToShow.forEach(coin => {
+                    const resultItem = document.createElement('div');
+                    resultItem.className = 'flex items-center p-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700 last:border-b-0';
+                    resultItem.dataset.code = coin.code;
+                    resultItem.dataset.symbol = coin.symbol;
+                    
+                    resultItem.innerHTML = `
+                        <img src="${coin.imageUrl}" alt="${coin.code}" class="w-8 h-8 mr-4 rounded-full" onerror="this.src='https://placehold.co/40x40/e2e8f0/a0aec0?text=?'">
+                        <div class="flex-grow">
+                            <div class="font-semibold text-gray-800 dark:text-gray-100">${coin.code}</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400">${coin.symbol}</div>
+                        </div>
+                    `;
+                    resultsContainer.appendChild(resultItem);
+                });
+
+                if (filteredData.length > MAX_RESULTS) {
+                    const moreResultsMessage = document.createElement('div');
+                    moreResultsMessage.className = 'p-3 text-center text-sm text-gray-500 italic';
+                    moreResultsMessage.textContent = `Hiển thị ${MAX_RESULTS} trong số ${filteredData.length} kết quả.`;
+                    resultsContainer.appendChild(moreResultsMessage);
+                }
+            }
+            resultsContainer.classList.remove('hidden');
+        }
+
+        function debounce(func, delay) {
+            let timeoutId;
+            return (...args) => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
+        
+        const handleSearch = () => {
+             const query = searchInput.value.trim().toLowerCase();
+            if (!query) {
+                resultsContainer.classList.add('hidden');
+                return;
+            }
+            const filtered = cryptoData.filter(coin =>
+                coin.code.toLowerCase().includes(query) ||
+                coin.symbol.toLowerCase().includes(query)
+            );
+            displayResults(filtered);
+        };
+        
+        // --- Modal Logic ---
+        function openModal() {
+            exchangeModal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+            setTimeout(() => {
+                exchangeModal.querySelector('.modal-overlay').classList.remove('opacity-0');
+                exchangeModal.querySelector('.modal-container').classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeModal() {
+            document.body.classList.remove('overflow-hidden');
+            exchangeModal.querySelector('.modal-overlay').classList.add('opacity-0');
+            exchangeModal.querySelector('.modal-container').classList.add('scale-95');
+            setTimeout(() => {
+                 exchangeModal.classList.add('hidden');
+            }, 200);
+        }
+        
+        // FIXED: Rewritten to use the official, public Binance API and handle its response structure.
+        async function fetchAndDisplayFundingRate(symbol) {
+            const fundingRateContainer = document.createElement('div');
+            fundingRateContainer.id = 'funding-rate-section';
+            fundingRateContainer.className = 'mt-6';
+            fundingRateContainer.innerHTML = `<h3 class="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Lịch sử Funding Rate (Binance)</h3><div class="text-center p-4">Đang tải...</div>`;
+            modalBody.appendChild(fundingRateContainer);
+
+            try {
+                const params = new URLSearchParams({
+                    symbol: symbol,
+                    limit: 10
+                });
+                const requestUrl = `${API_BINANCE_FUNDING_RATE_URL}?${params.toString()}`;
+
+                const response = await fetch(requestUrl);
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.msg || `Binance API Error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (!Array.isArray(result) || result.length === 0) {
+                    fundingRateContainer.innerHTML = `<h3 class="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Lịch sử Funding Rate (Binance)</h3><div class="p-4 text-center text-gray-500">Không tìm thấy dữ liệu funding rate.</div>`;
+                    return;
+                }
+                
+                const fundingData = result.sort((a, b) => b.fundingTime - a.fundingTime);
+
+                 let tableHtml = `
+                    <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                            <tr>
+                                <th scope="col" class="px-4 py-3">Thời gian</th>
+                                <th scope="col" class="px-4 py-3 text-right">Tỷ lệ Funding</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+                
+                fundingData.forEach(item => {
+                    const fundingTime = new Date(item.fundingTime).toLocaleString('vi-VN');
+                    const fundingRate = (parseFloat(item.fundingRate) * 100).toFixed(4);
+
+                    tableHtml += `
+                        <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                            <td class="px-4 py-2">${fundingTime}</td>
+                            <td class="px-4 py-2 text-right font-semibold ${fundingRate >= 0 ? 'price-up' : 'price-down'}">${fundingRate}%</td>
+                        </tr>`;
+                });
+
+                tableHtml += `</tbody></table>`;
+                fundingRateContainer.innerHTML = `<h3 class="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Lịch sử Funding Rate (Binance)</h3>` + tableHtml;
+
+
+            } catch(error) {
+                console.error("Lỗi khi lấy dữ liệu funding rate:", error);
+                fundingRateContainer.innerHTML = `<h3 class="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Lịch sử Funding Rate (Binance)</h3><div class="p-4 text-center text-red-500">${error.message}</div>`;
+            }
+        }
+
+
+        async function fetchAndDisplayExchanges(coinCode, coinSymbol) {
+            modalTitle.textContent = `Sàn Futures cho ${coinCode} (${coinSymbol})`;
+            modalBody.innerHTML = `<div id="exchange-list-section"><div class="flex justify-center items-center p-8"><svg class="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div></div>`;
+            openModal();
+
+            try {
+                const response = await fetch(`${API_MARKET_TICKER_URL}&code=${coinCode.toLowerCase()}`);
+                if (!response.ok) throw new Error(`Lỗi mạng: ${response.status}`);
+                const result = await response.json();
+                
+                const allExchanges = result.data.markets;
+                const exchanges = allExchanges.filter(ex => ex.pair2.toUpperCase() === 'USDT');
+
+                const exchangeListContainer = document.getElementById('exchange-list-section');
+
+                if (!exchanges || exchanges.length === 0) {
+                    exchangeListContainer.innerHTML = `<div class="p-4 text-center text-gray-500">Không tìm thấy sàn giao dịch Futures nào có cặp USDT.</div>`;
+                    return;
+                }
+
+                let tableHtml = `
+                    <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                            <tr>
+                                <th scope="col" class="px-4 py-3">#</th>
+                                <th scope="col" class="px-4 py-3">Sàn Giao Dịch</th>
+                                <th scope="col" class="px-4 py-3">Cặp</th>
+                                <th scope="col" class="px-4 py-3 text-right">Giá</th>
+                                <th scope="col" class="px-4 py-3 text-right">Tăng/Giảm 24h</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+                
+                let binanceSymbol = null;
+
+                exchanges.forEach((ex, index) => {
+                    if(ex.name.toLowerCase() === 'binance' && !binanceSymbol) {
+                       binanceSymbol = `${coinSymbol.toUpperCase()}USDT`;
+                    }
+
+                    const changeClass = ex.changerate >= 0 ? 'price-up' : 'price-down';
+                    const changeSign = ex.changerate >= 0 ? '+' : '';
+                    tableHtml += `
+                        <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                            <td class="px-4 py-2">${index + 1}</td>
+                            <th scope="row" class="px-4 py-2 font-medium text-gray-900 whitespace-nowrap dark:text-white flex items-center">
+                                <img src="${ex.logo}" alt="${ex.name}" class="w-6 h-6 mr-2 rounded-full">
+                                ${ex.name}
+                            </th>
+                            <td class="px-4 py-2">${ex.pair1}/${ex.pair2}</td>
+                            <td class="px-4 py-2 text-right font-semibold text-gray-800 dark:text-gray-200">${parseFloat(ex.price).toLocaleString('en-US', {minimumFractionDigits: 4})}</td>
+                            <td class="px-4 py-2 text-right font-semibold ${changeClass}">${changeSign}${ex.changerate.toFixed(2)}%</td>
+                        </tr>`;
+                });
+
+                tableHtml += `</tbody></table>`;
+                exchangeListContainer.innerHTML = tableHtml;
+
+                if (binanceSymbol) {
+                    fetchAndDisplayFundingRate(binanceSymbol);
+                }
+
+            } catch (error) {
+                console.error("Lỗi khi lấy dữ liệu sàn:", error);
+                document.getElementById('exchange-list-section').innerHTML = `<div class="p-4 text-center text-red-500">Không thể tải dữ liệu sàn. Vui lòng thử lại.</div>`;
+            }
+        }
+
+        // --- Event Listeners ---
+        searchInput.addEventListener('input', debounce(handleSearch, 250));
+        refreshBtn.addEventListener('click', refreshData);
+        closeModalBtn.addEventListener('click', closeModal);
+        modalOverlay.addEventListener('click', closeModal);
+
+        searchInput.addEventListener('focus', () => {
+             if (searchInput.value.trim()) handleSearch();
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!searchContainer.contains(event.target) && !refreshBtn.contains(event.target)) {
+                resultsContainer.classList.add('hidden');
+            }
+        });
+        
+        resultsContainer.addEventListener('click', (event) => {
+            const resultItem = event.target.closest('[data-code]');
+            if (resultItem) {
+                const { code, symbol } = resultItem.dataset;
+                fetchAndDisplayExchanges(code, symbol);
+                resultsContainer.classList.add('hidden');
+                searchInput.value = '';
+            }
+        });
+
+        // Initial app load
+        initializeApp();
+    </script>
+</body>
+</html>
+
