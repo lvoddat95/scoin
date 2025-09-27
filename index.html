@@ -69,9 +69,9 @@
         <!-- Real-time Funding Rate Table -->
         <div class="mt-10 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md">
             <h2 class="text-xl sm:text-2xl font-bold mb-4 text-gray-900 dark:text-white">Bảng Funding Rate Real-time (Binance)</h2>
-            <div class="overflow-y-auto max-h-[calc(80vh-120px)]">
+            <div class="overflow-y-auto max-h-[60vh]">
                 <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                    <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 sticky top-0">
                         <tr>
                             <th scope="col" class="px-4 py-3">Cặp Giao Dịch</th>
                             <th scope="col" class="px-4 py-3">Thời gian đến lần Funding tiếp theo</th>
@@ -198,15 +198,30 @@
             fundingRateTableBody.innerHTML = ''; // Clear previous content
 
             data.forEach(item => {
+                const symbolBase = item.symbol.replace('USDT', '');
+                const coinInfo = cryptoData.find(c => c.symbol && c.symbol.toUpperCase() === symbolBase);
+
                 const row = document.createElement('tr');
                 row.className = 'border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600';
                 row.dataset.nextFundingTime = item.nextFundingTime; // Store for countdown update
 
                 const fundingRate = (parseFloat(item.lastFundingRate) * 100).toFixed(4);
                 const rateClass = fundingRate >= 0 ? 'price-up' : 'price-down';
+                
+                let symbolCellHtml;
+                if (coinInfo) {
+                    // Nếu tìm thấy thông tin coin, làm cho nó có thể nhấp được
+                    row.dataset.code = coinInfo.code;
+                    row.dataset.symbol = coinInfo.symbol;
+                    row.dataset.displayName = coinInfo.displayName;
+                    symbolCellHtml = `<td class="px-4 py-2 font-semibold text-gray-800 dark:text-gray-200"><a href="#" class="hover:underline cursor-pointer coin-link">${item.symbol}</a></td>`;
+                } else {
+                    // Nếu không, chỉ hiển thị văn bản
+                    symbolCellHtml = `<td class="px-4 py-2 font-semibold text-gray-800 dark:text-gray-200">${item.symbol}</td>`;
+                }
 
                 row.innerHTML = `
-                    <td class="px-4 py-2 font-semibold text-gray-800 dark:text-gray-200">${item.symbol}</td>
+                    ${symbolCellHtml}
                     <td class="px-4 py-2 countdown-timer">--:--:--</td>
                     <td class="px-4 py-2 text-right font-semibold ${rateClass}">${fundingRate}%</td>
                 `;
@@ -236,7 +251,7 @@
         }
 
 
-        function initializeApp() {
+        async function initializeApp() {
             const cachedData = localStorage.getItem(CACHE_KEY);
             if (cachedData) {
                 try {
@@ -245,13 +260,13 @@
                     setTimeout(() => statusMessage.textContent = '', 3000);
                 } catch(e) {
                     console.error("Lỗi phân tích dữ liệu cache:", e);
-                    refreshData();
+                    await refreshData();
                 }
             } else {
-                refreshData();
+                await refreshData();
             }
             
-            fetchGlobalFundingRates();
+            await fetchGlobalFundingRates();
             setInterval(updateCountdownTimers, 1000);
             setInterval(fetchGlobalFundingRates, 60000); // Refresh data every minute
         }
@@ -528,6 +543,17 @@
                 fetchAndDisplayExchanges(code, symbol, displayName);
                 resultsContainer.classList.add('hidden');
                 searchInput.value = '';
+            }
+        });
+
+        fundingRateTableBody.addEventListener('click', (event) => {
+            if (event.target.classList.contains('coin-link')) {
+                event.preventDefault();
+                const row = event.target.closest('tr');
+                if (row && row.dataset.code) {
+                    const { code, symbol, displayName } = row.dataset;
+                    fetchAndDisplayExchanges(code, symbol, displayName);
+                }
             }
         });
 
