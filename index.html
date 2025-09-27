@@ -32,11 +32,11 @@
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
 
-    <div class="container mx-auto p-4 sm:p-6 md:p-8 max-w-2xl">
+    <div class="container mx-auto p-4 sm:p-6 md:p-8 max-w-4xl">
         <h1 class="text-3xl sm:text-4xl font-bold text-center mb-6 text-gray-900 dark:text-white">Tra Cứu Tiền Điện Tử</h1>
 
         <!-- Search Input and Container -->
-        <div class="flex items-start space-x-2">
+        <div class="flex items-start space-x-2 max-w-2xl mx-auto">
             <div class="relative flex-grow" id="search-container">
                 <div class="relative">
                      <input 
@@ -64,7 +64,26 @@
                 </svg>
             </button>
         </div>
-        <div id="status-message" class="text-center text-sm text-gray-500 dark:text-gray-400 h-5 mt-2"></div>
+        <div id="status-message" class="text-center text-sm text-gray-500 dark:text-gray-400 h-5 mt-2 max-w-2xl mx-auto"></div>
+
+        <!-- Real-time Funding Rate Table -->
+        <div class="mt-10 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md">
+            <h2 class="text-xl sm:text-2xl font-bold mb-4 text-gray-900 dark:text-white">Bảng Funding Rate Real-time (Binance)</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                        <tr>
+                            <th scope="col" class="px-4 py-3">Cặp Giao Dịch</th>
+                            <th scope="col" class="px-4 py-3">Thời gian đến lần Funding tiếp theo</th>
+                            <th scope="col" class="px-4 py-3 text-right">Tỷ lệ Funding</th>
+                        </tr>
+                    </thead>
+                    <tbody id="funding-rate-table-body">
+                        <!-- Data will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- Exchange Modal -->
@@ -102,13 +121,13 @@
         const modalTitle = document.getElementById('modalTitle');
         const modalBody = document.getElementById('modalBody');
         const closeModalBtn = document.getElementById('closeModalBtn');
-
+        const fundingRateTableBody = document.getElementById('funding-rate-table-body');
 
         // API and Constants
         const API_DATA_LIST_URL = 'https://dncapi.flink1.com/api/v2/coin/data_list?webp=1';
         const API_MARKET_TICKER_URL = 'https://dncapi.flink1.com/api/v2/Coin/market_ticker?tickertype=1&webp=1';
         const API_BINANCE_FUNDING_RATE_URL = 'https://fapi.binance.com/fapi/v1/fundingRate';
-        const API_BINANCE_PREMIUM_INDEX_URL = 'https://fapi.binance.com/fapi/v1/premiumIndex'; // ADDED: For current funding info
+        const API_BINANCE_PREMIUM_INDEX_URL = 'https://fapi.binance.com/fapi/v1/premiumIndex'; 
         const IMAGE_BASE_URL = 'https://s2.flink1.com/cdn-cgi/image/width=40,quality=75/logo/1/';
         const CACHE_KEY = 'cryptoApiCache';
         const MAX_RESULTS = 100;
@@ -147,6 +166,76 @@
             }
         }
 
+        // --- Real-time Funding Rate Table Logic ---
+
+        function formatCountdown(ms) {
+            if (ms <= 0) return "00:00:00";
+            let seconds = Math.floor((ms / 1000) % 60);
+            let minutes = Math.floor((ms / (1000 * 60)) % 60);
+            let hours = Math.floor((ms / (1000 * 60 * 60)));
+
+            hours = hours.toString().padStart(2, '0');
+            minutes = minutes.toString().padStart(2, '0');
+            seconds = seconds.toString().padStart(2, '0');
+
+            return `${hours}:${minutes}:${seconds}`;
+        }
+
+        function updateCountdownTimers() {
+            const timers = fundingRateTableBody.querySelectorAll('.countdown-timer');
+            const now = Date.now();
+            timers.forEach(timer => {
+                const row = timer.closest('tr');
+                if (row && row.dataset.nextFundingTime) {
+                    const nextTime = parseInt(row.dataset.nextFundingTime, 10);
+                    const remaining = nextTime - now;
+                    timer.textContent = formatCountdown(remaining);
+                }
+            });
+        }
+
+        function displayGlobalFundingRates(data) {
+            fundingRateTableBody.innerHTML = ''; // Clear previous content
+
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                row.className = 'border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600';
+                row.dataset.nextFundingTime = item.nextFundingTime; // Store for countdown update
+
+                const fundingRate = (parseFloat(item.lastFundingRate) * 100).toFixed(4);
+                const rateClass = fundingRate >= 0 ? 'price-up' : 'price-down';
+
+                row.innerHTML = `
+                    <td class="px-4 py-2 font-semibold text-gray-800 dark:text-gray-200">${item.symbol}</td>
+                    <td class="px-4 py-2 countdown-timer">--:--:--</td>
+                    <td class="px-4 py-2 text-right font-semibold ${rateClass}">${fundingRate}%</td>
+                `;
+                fundingRateTableBody.appendChild(row);
+            });
+            updateCountdownTimers(); // Initial call to populate timers
+        }
+        
+        async function fetchGlobalFundingRates() {
+            if (!fundingRateTableBody.querySelector('.loading-row')) {
+                 fundingRateTableBody.innerHTML = `<tr class="loading-row"><td colspan="3" class="text-center p-8"><svg class="animate-spin h-8 w-8 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></td></tr>`;
+            }
+           
+            try {
+                const response = await fetch(API_BINANCE_PREMIUM_INDEX_URL);
+                if (!response.ok) throw new Error('Failed to fetch global funding rates');
+                let data = await response.json();
+
+                let usdtPairs = data.filter(p => p.symbol.endsWith('USDT'));
+                usdtPairs.sort((a, b) => parseFloat(a.lastFundingRate) - parseFloat(b.lastFundingRate));
+
+                displayGlobalFundingRates(usdtPairs);
+            } catch (error) {
+                console.error("Error fetching global funding rates:", error);
+                fundingRateTableBody.innerHTML = `<tr><td colspan="3" class="text-center p-4 text-red-500">Không thể tải dữ liệu funding rate.</td></tr>`;
+            }
+        }
+
+
         function initializeApp() {
             const cachedData = localStorage.getItem(CACHE_KEY);
             if (cachedData) {
@@ -161,6 +250,10 @@
             } else {
                 refreshData();
             }
+            
+            fetchGlobalFundingRates();
+            setInterval(updateCountdownTimers, 1000);
+            setInterval(fetchGlobalFundingRates, 60000); // Refresh data every minute
         }
 
         // --- Search UI Logic ---
@@ -343,6 +436,9 @@
                 if (!response.ok) throw new Error(`Lỗi mạng: ${response.status}`);
                 const result = await response.json();
                 
+                if(!result.data || !result.data.markets) {
+                    throw new Error('Cấu trúc dữ liệu không hợp lệ từ API sàn giao dịch.');
+                }
                 const allExchanges = result.data.markets;
                 const exchanges = allExchanges.filter(ex => ex.pair2.toUpperCase() === 'USDT');
 
