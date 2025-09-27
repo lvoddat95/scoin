@@ -213,9 +213,9 @@
                 return;
             }
             const filtered = cryptoData.filter(coin =>
-                coin.displayName.toLowerCase().includes(query) ||
-                coin.symbol.toLowerCase().includes(query) ||
-                coin.code.toLowerCase().includes(query)
+                (coin.displayName && coin.displayName.toLowerCase().includes(query)) ||
+                (coin.symbol && coin.symbol.toLowerCase().includes(query)) ||
+                (coin.code && coin.code.toLowerCase().includes(query))
             );
             displayResults(filtered);
         };
@@ -440,5 +440,4 @@
     </script>
 </body>
 </html>
-
 
