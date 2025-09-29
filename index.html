@@ -73,9 +73,9 @@
                 <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
                     <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 sticky top-0">
                         <tr>
-                            <th scope="col" class="px-1 py-3">Cặp Giao Dịch</th>
-                            <th scope="col" class="px-1 py-3">Thời gian đến lần Funding tiếp theo</th>
-                            <th scope="col" class="px-1 py-3 text-right">Tỷ lệ Funding</th>
+                            <th scope="col" class="px-4 py-3">Cặp Giao Dịch</th>
+                            <th scope="col" class="px-4 py-3">Thời gian đến lần Funding tiếp theo</th>
+                            <th scope="col" class="px-4 py-3 text-right">Tỷ lệ Funding</th>
                         </tr>
                     </thead>
                     <tbody id="funding-rate-table-body">
@@ -84,6 +84,48 @@
                 </table>
             </div>
         </div>
+
+        <!-- Percentage Change Calculator -->
+        <div class="mt-10 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md">
+            <h2 class="text-xl sm:text-2xl font-bold mb-4 text-gray-900 dark:text-white">Công cụ tính toán chênh lệch</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="initialValue" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Giá trị ban đầu V₁</label>
+                    <input type="text" id="initialValue" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="0,000">
+                </div>
+                <div>
+                    <label for="finalValue" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Giá trị cuối cùng V₂</label>
+                    <input type="text" id="finalValue" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="0,000">
+                </div>
+                <div>
+                    <label for="percentageChange" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Phần trăm thay đổi</label>
+                    <div class="relative mt-1">
+                        <input type="text" id="percentageChange" class="block w-full pl-3 pr-12 py-2 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm sm:text-sm font-semibold" readonly>
+                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm">%</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label for="difference" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Sự khác biệt</label>
+                    <input type="text" id="difference" class="mt-1 block w-full px-3 py-2 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm sm:text-sm font-semibold" readonly>
+                </div>
+                 <div>
+                    <label for="leverage" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Đòn bẩy</label>
+                    <input type="number" id="leverage" min="0" max="200" value="1" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="1">
+                </div>
+                <div>
+                    <label for="profitOrLoss" class="block text-sm font-medium text-gray-700 dark:text-gray-300">% Lãi/Lỗ</label>
+                    <div class="relative mt-1">
+                        <input type="text" id="profitOrLoss" class="block w-full pl-3 pr-12 py-2 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm sm:text-sm font-semibold" readonly>
+                         <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm">%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Exchange Modal -->
@@ -122,6 +164,13 @@
         const modalBody = document.getElementById('modalBody');
         const closeModalBtn = document.getElementById('closeModalBtn');
         const fundingRateTableBody = document.getElementById('funding-rate-table-body');
+        const initialValueInput = document.getElementById('initialValue');
+        const finalValueInput = document.getElementById('finalValue');
+        const percentageChangeInput = document.getElementById('percentageChange');
+        const differenceInput = document.getElementById('difference');
+        const leverageInput = document.getElementById('leverage');
+        const profitOrLossInput = document.getElementById('profitOrLoss');
+
 
         // API and Constants
         const API_DATA_LIST_URL = 'https://dncapi.flink1.com/api/v2/coin/data_list?webp=1';
@@ -214,16 +263,16 @@
                     row.dataset.code = coinInfo.code;
                     row.dataset.symbol = coinInfo.symbol;
                     row.dataset.displayName = coinInfo.displayName;
-                    symbolCellHtml = `<td class="px-1 py-2 font-semibold text-gray-800 dark:text-gray-200"><a href="#" class="hover:underline cursor-pointer coin-link">${item.symbol}</a></td>`;
+                    symbolCellHtml = `<td class="px-4 py-2 font-semibold text-gray-800 dark:text-gray-200"><a href="#" class="hover:underline cursor-pointer coin-link">${item.symbol}</a></td>`;
                 } else {
                     // Nếu không, chỉ hiển thị văn bản
-                    symbolCellHtml = `<td class="px-1 py-2 font-semibold text-gray-800 dark:text-gray-200">${item.symbol}</td>`;
+                    symbolCellHtml = `<td class="px-4 py-2 font-semibold text-gray-800 dark:text-gray-200">${item.symbol}</td>`;
                 }
 
                 row.innerHTML = `
                     ${symbolCellHtml}
-                    <td class="px-1 py-2 countdown-timer">--:--:--</td>
-                    <td class="px-1 py-2 text-right font-semibold ${rateClass}">${fundingRate}%</td>
+                    <td class="px-4 py-2 countdown-timer">--:--:--</td>
+                    <td class="px-4 py-2 text-right font-semibold ${rateClass}">${fundingRate}%</td>
                 `;
                 fundingRateTableBody.appendChild(row);
             });
@@ -426,8 +475,8 @@
 
                     tableHtml += `
                         <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                            <td class="px-1 py-2">${fundingTime}</td>
-                            <td class="px-1 py-2 text-right font-semibold ${fundingRate >= 0 ? 'price-up' : 'price-down'}">${fundingRate}%</td>
+                            <td class="px-4 py-2">${fundingTime}</td>
+                            <td class="px-4 py-2 text-right font-semibold ${fundingRate >= 0 ? 'price-up' : 'price-down'}">${fundingRate}%</td>
                         </tr>`;
                 });
 
@@ -488,14 +537,14 @@
                     const changeSign = ex.changerate >= 0 ? '+' : '';
                     tableHtml += `
                         <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                            <td class="px-1 py-2">${index + 1}</td>
-                            <th scope="row" class="px-1 py-2 font-medium text-gray-900 whitespace-nowrap dark:text-white flex items-center">
+                            <td class="px-4 py-2">${index + 1}</td>
+                            <th scope="row" class="px-4 py-2 font-medium text-gray-900 whitespace-nowrap dark:text-white flex items-center">
                                 <img src="${ex.logo}" alt="${ex.name}" class="w-6 h-6 mr-2 rounded-full">
                                 ${ex.name}
                             </th>
-                            <td class="px-1 py-2">${ex.pair1}/${ex.pair2}</td>
-                            <td class="px-1 py-2 text-right font-semibold text-gray-800 dark:text-gray-200">${parseFloat(ex.price).toLocaleString('en-US', {minimumFractionDigits: 4})}</td>
-                            <td class="px-1 py-2 text-right font-semibold ${changeClass}">${changeSign}${ex.changerate.toFixed(2)}%</td>
+                            <td class="px-4 py-2">${ex.pair1}/${ex.pair2}</td>
+                            <td class="px-4 py-2 text-right font-semibold text-gray-800 dark:text-gray-200">${parseFloat(ex.price).toLocaleString('en-US', {minimumFractionDigits: 4})}</td>
+                            <td class="px-4 py-2 text-right font-semibold ${changeClass}">${changeSign}${ex.changerate.toFixed(2)}%</td>
                         </tr>`;
                 });
 
@@ -519,12 +568,45 @@
                 document.getElementById('exchange-list-section').innerHTML = `<div class="p-4 text-center text-red-500">Không thể tải dữ liệu sàn. Vui lòng thử lại.</div>`;
             }
         }
+        
+        // --- Calculator Logic ---
+        function calculateDifference() {
+            // Replace comma with dot for calculation and parse to float
+            const v1 = parseFloat(initialValueInput.value.replace(',', '.'));
+            const v2 = parseFloat(finalValueInput.value.replace(',', '.'));
+            const leverage = parseFloat(leverageInput.value);
+
+            if (!isNaN(v1) && !isNaN(v2)) {
+                const diff = v2 - v1;
+                const percentage = (v1 !== 0) ? (diff / v1) * 100 : 0;
+
+                // Format output with comma for decimal point for display
+                differenceInput.value = diff.toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 8 }).replace(/\./g, ',');
+                percentageChangeInput.value = percentage.toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 5 }).replace(/\./g, ',');
+
+                if (!isNaN(leverage)) {
+                    const profitOrLoss = percentage * leverage;
+                    profitOrLossInput.value = profitOrLoss.toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 5 }).replace(/\./g, ',');
+                } else {
+                     profitOrLossInput.value = '';
+                }
+
+            } else {
+                differenceInput.value = '';
+                percentageChangeInput.value = '';
+                profitOrLossInput.value = '';
+            }
+        }
+
 
         // --- Event Listeners ---
         searchInput.addEventListener('input', debounce(handleSearch, 250));
         refreshBtn.addEventListener('click', refreshData);
         closeModalBtn.addEventListener('click', closeModal);
         modalOverlay.addEventListener('click', closeModal);
+        initialValueInput.addEventListener('input', calculateDifference);
+        finalValueInput.addEventListener('input', calculateDifference);
+        leverageInput.addEventListener('input', calculateDifference);
 
         searchInput.addEventListener('focus', () => {
              if (searchInput.value.trim()) handleSearch();
