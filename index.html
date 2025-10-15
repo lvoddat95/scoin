@@ -177,6 +177,9 @@
         const API_MARKET_TICKER_URL = 'https://dncapi.flink1.com/api/v2/Coin/market_ticker?tickertype=1&webp=1';
         const API_BINANCE_FUNDING_RATE_URL = 'https://fapi.binance.com/fapi/v1/fundingRate';
         const API_BINANCE_PREMIUM_INDEX_URL = 'https://fapi.binance.com/fapi/v1/premiumIndex'; 
+        const API_BINANCE_KLINES_URL = 'https://fapi.binance.com/fapi/v1/klines';
+        const API_BINANCE_LONG_SHORT_URL = 'https://fapi.binance.com/futures/data/globalLongShortAccountRatio';
+        const API_BINANCE_OPEN_INTEREST_URL = 'https://fapi.binance.com/fapi/v1/openInterest';
         const IMAGE_BASE_URL = 'https://s2.flink1.com/cdn-cgi/image/width=40,quality=75/logo/1/';
         const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=';
 
@@ -397,18 +400,60 @@
         }
 
         // --- Gemini API ---
-        async function getGeminiAnalysis(displayName, container) {
+        async function getGeminiAnalysis(displayName, binanceSymbol, container) {
             const button = document.getElementById('geminiAnalyzeBtn');
             button.disabled = true;
-            container.innerHTML = `<div class="flex justify-center items-center p-4"><svg class="animate-spin h-6 w-6 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>`;
+            container.innerHTML = `<div class="flex justify-center items-center p-4"><svg class="animate-spin h-6 w-6 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span class="ml-2">Đang phân tích dữ liệu...</span></div>`;
 
-            const userQuery = `Là một chuyên gia phân tích kỹ thuật tiền điện tử, hãy phân tích đồng coin '${displayName}'.
-                1.  **Thông tin giá:** Cung cấp giá hiện tại và biên độ dao động trong 24 giờ qua.
-                2.  **Phân tích xu hướng:** Dựa trên dữ liệu gần đây, xu hướng chung là gì (tăng, giảm, đi ngang)?
-                3.  **Lời khuyên giao dịch (Tham khảo):** Đưa ra một đề xuất giao dịch cho vị thế Long hoặc Short trong ngắn hạn. Bao gồm các mức giá cụ thể cho:
+            if (!binanceSymbol) {
+                 container.innerHTML = `<div class="p-4 text-center text-red-500">Không tìm thấy cặp giao dịch trên Binance để phân tích.</div>`;
+                 return;
+            }
+
+            // Fetch additional data from Binance
+            let dataContext = "Dữ liệu thị trường từ Binance:\n";
+            try {
+                const [klinesResult, longShortResult, openInterestResult] = await Promise.allSettled([
+                    fetch(`${API_BINANCE_KLINES_URL}?symbol=${binanceSymbol}&interval=4h&limit=10`),
+                    fetch(`${API_BINANCE_LONG_SHORT_URL}?symbol=${binanceSymbol}&period=4h&limit=1`),
+                    fetch(`${API_BINANCE_OPEN_INTEREST_URL}?symbol=${binanceSymbol}`)
+                ]);
+
+                if (klinesResult.status === 'fulfilled' && klinesResult.value.ok) {
+                    const klines = await klinesResult.value.json();
+                    const lastKline = klines[klines.length - 1];
+                    dataContext += `- Dữ liệu nến 4h cuối cùng: Mở=${lastKline[1]}, Cao=${lastKline[2]}, Thấp=${lastKline[3]}, Đóng=${lastKline[4]}, Khối lượng=${lastKline[5]}\n`;
+                }
+
+                if (longShortResult.status === 'fulfilled' && longShortResult.value.ok) {
+                    const ratio = await longShortResult.value.json();
+                    if(ratio.length > 0) {
+                       dataContext += `- Tỷ lệ Long/Short (4h): ${parseFloat(ratio[0].longShortRatio).toFixed(4)}\n`;
+                    }
+                }
+
+                if (openInterestResult.status === 'fulfilled' && openInterestResult.value.ok) {
+                    const oi = await openInterestResult.value.json();
+                    dataContext += `- Khối lượng Hợp đồng Mở (Open Interest): ${parseFloat(oi.openInterest).toLocaleString('en-US')}\n`;
+                }
+
+            } catch (e) {
+                console.error("Lỗi khi lấy dữ liệu Binance cho Gemini:", e);
+                dataContext += " (Không thể lấy một vài dữ liệu phụ từ Binance)\n";
+            }
+
+
+            const userQuery = `Là một chuyên gia phân tích kỹ thuật tiền điện tử, hãy phân tích đồng coin '${displayName}' (${binanceSymbol}).
+                Sử dụng các dữ liệu sau đây làm cơ sở chính:
+                ${dataContext}
+
+                Dựa vào dữ liệu trên và thông tin thị trường bạn có, hãy cung cấp:
+                1.  **Phân tích xu hướng:** Xu hướng chung là gì (tăng, giảm, đi ngang)? Các yếu tố nào (ví dụ: tỷ lệ long/short, khối lượng giao dịch, mô hình nến) đang ủng hộ xu hướng này?
+                2.  **Lời khuyên giao dịch (Tham khảo):** Đưa ra một đề xuất giao dịch cho vị thế Long hoặc Short trong ngắn hạn. Bao gồm các mức giá cụ thể cho:
                     - **Entry (Điểm vào lệnh):**
                     - **Take Profit (TP):**
                     - **Stop Loss (SL):**
+                3.  **Các yếu tố ảnh hưởng:** Liệt kê ngắn gọn các yếu tố có thể ảnh hưởng đến giá trong thời gian tới.
 
                 **Tuyên bố miễn trừ trách nhiệm:** Luôn thêm dòng chữ "Lưu ý: Phân tích này chỉ mang tính chất tham khảo, không phải là lời khuyên đầu tư chuyên nghiệp." ở cuối cùng.
                 Giữ câu trả lời bằng tiếng Việt.`;
@@ -562,12 +607,15 @@
             
             openModal();
 
+            let binanceSymbol = null;
+            if (coinSymbol) {
+                 binanceSymbol = `${coinSymbol.toUpperCase()}USDT`;
+            }
+
              // Add event listener for the newly created Gemini button
             const geminiBtn = document.getElementById('geminiAnalyzeBtn');
             const geminiResultContainer = document.getElementById('gemini-analysis-result');
-            geminiBtn.addEventListener('click', () => getGeminiAnalysis(displayName, geminiResultContainer));
-
-            let binanceSymbol = null;
+            geminiBtn.addEventListener('click', () => getGeminiAnalysis(displayName, binanceSymbol, geminiResultContainer));
 
             try {
                 const response = await fetch(`${API_MARKET_TICKER_URL}&code=${coinCode.toLowerCase()}`);
@@ -624,11 +672,6 @@
             } catch (error) {
                 console.error("Lỗi khi lấy dữ liệu sàn:", error);
                 document.getElementById('exchange-list-section').innerHTML = `<div class="p-4 text-center text-red-500">Không thể tải dữ liệu sàn. Vui lòng thử lại.</div>`;
-            }
-
-            // Determine Binance symbol if not found in the list above
-            if (!binanceSymbol && coinSymbol) {
-                 binanceSymbol = `${coinSymbol.toUpperCase()}USDT`;
             }
 
             if (binanceSymbol) {
