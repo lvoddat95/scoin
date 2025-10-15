@@ -91,11 +91,11 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label for="initialValue" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Giá trị ban đầu V₁</label>
-                    <input type="number" id="initialValue" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="0,000">
+                    <input type="text" id="initialValue" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="0,000">
                 </div>
                 <div>
                     <label for="finalValue" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Giá trị cuối cùng V₂</label>
-                    <input type="number" id="finalValue" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="0,000">
+                    <input type="text" id="finalValue" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="0,000">
                 </div>
                 <div>
                     <label for="percentageChange" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Phần trăm thay đổi</label>
@@ -178,6 +178,8 @@
         const API_BINANCE_FUNDING_RATE_URL = 'https://fapi.binance.com/fapi/v1/fundingRate';
         const API_BINANCE_PREMIUM_INDEX_URL = 'https://fapi.binance.com/fapi/v1/premiumIndex'; 
         const IMAGE_BASE_URL = 'https://s2.flink1.com/cdn-cgi/image/width=40,quality=75/logo/1/';
+        const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=';
+
         const CACHE_KEY = 'cryptoApiCache';
         const MAX_RESULTS = 100;
         
@@ -259,13 +261,11 @@
                 
                 let symbolCellHtml;
                 if (coinInfo) {
-                    // Nếu tìm thấy thông tin coin, làm cho nó có thể nhấp được
                     row.dataset.code = coinInfo.code;
                     row.dataset.symbol = coinInfo.symbol;
                     row.dataset.displayName = coinInfo.displayName;
                     symbolCellHtml = `<td class="px-1 py-2 font-semibold text-gray-800 dark:text-gray-200"><a href="#" class="hover:underline cursor-pointer coin-link">${item.symbol}</a></td>`;
                 } else {
-                    // Nếu không, chỉ hiển thị văn bản
                     symbolCellHtml = `<td class="px-1 py-2 font-semibold text-gray-800 dark:text-gray-200">${item.symbol}</td>`;
                 }
 
@@ -395,6 +395,56 @@
                  exchangeModal.classList.add('hidden');
             }, 200);
         }
+
+        // --- Gemini API ---
+        async function getGeminiAnalysis(displayName, container) {
+            const button = document.getElementById('geminiAnalyzeBtn');
+            button.disabled = true;
+            container.innerHTML = `<div class="flex justify-center items-center p-4"><svg class="animate-spin h-6 w-6 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>`;
+
+            const userQuery = `Là một chuyên gia phân tích kỹ thuật tiền điện tử, hãy phân tích đồng coin '${displayName}'.
+                1.  **Thông tin giá:** Cung cấp giá hiện tại và biên độ dao động trong 24 giờ qua.
+                2.  **Phân tích xu hướng:** Dựa trên dữ liệu gần đây, xu hướng chung là gì (tăng, giảm, đi ngang)?
+                3.  **Lời khuyên giao dịch (Tham khảo):** Đưa ra một đề xuất giao dịch cho vị thế Long hoặc Short trong ngắn hạn. Bao gồm các mức giá cụ thể cho:
+                    - **Entry (Điểm vào lệnh):**
+                    - **Take Profit (TP):**
+                    - **Stop Loss (SL):**
+
+                **Tuyên bố miễn trừ trách nhiệm:** Luôn thêm dòng chữ "Lưu ý: Phân tích này chỉ mang tính chất tham khảo, không phải là lời khuyên đầu tư chuyên nghiệp." ở cuối cùng.
+                Giữ câu trả lời bằng tiếng Việt.`;
+            const apiKey = ""; 
+
+            try {
+                const response = await fetch(GEMINI_API_URL + apiKey, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: userQuery }] }],
+                        tools: [{ "google_search": {} }],
+                    })
+                });
+
+                if (!response.ok) {
+                     throw new Error(`Gemini API error: ${response.status}`);
+                }
+
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (text) {
+                    // Replace markdown bolding with HTML bolding for better display
+                    let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-gray-900 dark:text-white">$1</strong>');
+                    container.innerHTML = `<p class="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">${formattedText.replace(/\n/g, '<br>')}</p>`;
+                } else {
+                    throw new Error("Không nhận được nội dung từ Gemini.");
+                }
+
+            } catch(error) {
+                console.error("Lỗi khi gọi Gemini API:", error);
+                container.innerHTML = `<div class="p-4 text-center text-red-500">Không thể tải phân tích. Vui lòng thử lại.</div>`;
+                button.disabled = false;
+            }
+        }
         
         async function fetchAndDisplayCurrentFundingInfo(symbol, container) {
             container.className = 'mt-6';
@@ -492,80 +542,104 @@
 
         async function fetchAndDisplayExchanges(coinCode, coinSymbol, displayName) {
             modalTitle.textContent = `Sàn Futures cho ${displayName} (${coinSymbol})`;
-            modalBody.innerHTML = `<div id="exchange-list-section"><div class="flex justify-center items-center p-8"><svg class="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div></div>`;
+            
+            // Setup Modal HTML with Gemini section
+            modalBody.innerHTML = `
+                <div id="gemini-analysis-section" class="mb-6 p-4 bg-blue-50 dark:bg-gray-700/50 rounded-lg">
+                    <button id="geminiAnalyzeBtn" class="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        ✨ Phân tích Coin này
+                    </button>
+                    <div id="gemini-analysis-result" class="mt-4"></div>
+                </div>
+                <div id="exchange-list-section">
+                    <div class="flex justify-center items-center p-8">
+                        <svg class="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+                </div>`;
+            
             openModal();
+
+             // Add event listener for the newly created Gemini button
+            const geminiBtn = document.getElementById('geminiAnalyzeBtn');
+            const geminiResultContainer = document.getElementById('gemini-analysis-result');
+            geminiBtn.addEventListener('click', () => getGeminiAnalysis(displayName, geminiResultContainer));
+
+            let binanceSymbol = null;
 
             try {
                 const response = await fetch(`${API_MARKET_TICKER_URL}&code=${coinCode.toLowerCase()}`);
                 if (!response.ok) throw new Error(`Lỗi mạng: ${response.status}`);
                 const result = await response.json();
                 
-                if(!result.data || !result.data.markets) {
-                    throw new Error('Cấu trúc dữ liệu không hợp lệ từ API sàn giao dịch.');
-                }
-                const allExchanges = result.data.markets;
-                const exchanges = allExchanges.filter(ex => ex.pair2.toUpperCase() === 'USDT');
-
                 const exchangeListContainer = document.getElementById('exchange-list-section');
-
-                if (!exchanges || exchanges.length === 0) {
-                    exchangeListContainer.innerHTML = `<div class="p-4 text-center text-gray-500">Không tìm thấy sàn giao dịch Futures nào có cặp USDT.</div>`;
-                    return;
-                }
-
-                let tableHtml = `
-                    <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                            <tr>
-                                <th scope="col" class="px-1 py-3">#</th>
-                                <th scope="col" class="px-1 py-3">Sàn Giao Dịch</th>
-                                <th scope="col" class="px-1 py-3">Cặp</th>
-                                <th scope="col" class="px-1 py-3 text-right">Giá</th>
-                                <th scope="col" class="px-1 py-3 text-right">Tăng/Giảm 24h</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
                 
-                let binanceSymbol = null;
+                if(!result.data || !result.data.markets || result.data.markets.length === 0) {
+                     exchangeListContainer.innerHTML = `<div class="p-4 text-center text-gray-500">Không tìm thấy sàn giao dịch Futures nào có cặp USDT.</div>`;
+                } else {
+                    const allExchanges = result.data.markets;
+                    const exchanges = allExchanges.filter(ex => ex.pair2.toUpperCase() === 'USDT');
 
-                exchanges.forEach((ex, index) => {
-                    if(ex.name.toLowerCase() === 'binance' && !binanceSymbol) {
-                       binanceSymbol = `${coinSymbol.toUpperCase()}USDT`;
+                    if (exchanges.length === 0) {
+                        exchangeListContainer.innerHTML = `<div class="p-4 text-center text-gray-500">Không tìm thấy sàn giao dịch Futures nào có cặp USDT.</div>`;
+                    } else {
+                        let tableHtml = `
+                            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                    <tr>
+                                        <th scope="col" class="px-1 py-3">#</th>
+                                        <th scope="col" class="px-1 py-3">Sàn Giao Dịch</th>
+                                        <th scope="col" class="px-1 py-3">Cặp</th>
+                                        <th scope="col" class="px-1 py-3 text-right">Giá</th>
+                                        <th scope="col" class="px-1 py-3 text-right">Tăng/Giảm 24h</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+                        
+                        exchanges.forEach((ex, index) => {
+                             if(ex.name.toLowerCase() === 'binance' && !binanceSymbol) {
+                                binanceSymbol = `${coinSymbol.toUpperCase()}USDT`;
+                            }
+                            const changeClass = ex.changerate >= 0 ? 'price-up' : 'price-down';
+                            const changeSign = ex.changerate >= 0 ? '+' : '';
+                            tableHtml += `
+                                <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                    <td class="px-1 py-2">${index + 1}</td>
+                                    <th scope="row" class="px-1 py-2 font-medium text-gray-900 whitespace-nowrap dark:text-white flex items-center">
+                                        <img src="${ex.logo}" alt="${ex.name}" class="w-6 h-6 mr-2 rounded-full">
+                                        ${ex.name}
+                                    </th>
+                                    <td class="px-1 py-2">${ex.pair1}/${ex.pair2}</td>
+                                    <td class="px-1 py-2 text-right font-semibold text-gray-800 dark:text-gray-200">${parseFloat(ex.price).toLocaleString('en-US', {minimumFractionDigits: 4})}</td>
+                                    <td class="px-1 py-2 text-right font-semibold ${changeClass}">${changeSign}${ex.changerate.toFixed(2)}%</td>
+                                </tr>`;
+                        });
+
+                        tableHtml += `</tbody></table>`;
+                        exchangeListContainer.innerHTML = tableHtml;
                     }
-
-                    const changeClass = ex.changerate >= 0 ? 'price-up' : 'price-down';
-                    const changeSign = ex.changerate >= 0 ? '+' : '';
-                    tableHtml += `
-                        <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                            <td class="px-1 py-2">${index + 1}</td>
-                            <th scope="row" class="px-1 py-2 font-medium text-gray-900 whitespace-nowrap dark:text-white flex items-center">
-                                <img src="${ex.logo}" alt="${ex.name}" class="w-6 h-6 mr-2 rounded-full">
-                                ${ex.name}
-                            </th>
-                            <td class="px-1 py-2">${ex.pair1}/${ex.pair2}</td>
-                            <td class="px-1 py-2 text-right font-semibold text-gray-800 dark:text-gray-200">${parseFloat(ex.price).toLocaleString('en-US', {minimumFractionDigits: 4})}</td>
-                            <td class="px-1 py-2 text-right font-semibold ${changeClass}">${changeSign}${ex.changerate.toFixed(2)}%</td>
-                        </tr>`;
-                });
-
-                tableHtml += `</tbody></table>`;
-                exchangeListContainer.innerHTML = tableHtml;
-
-                if (binanceSymbol) {
-                    const currentFundingContainer = document.createElement('div');
-                    modalBody.appendChild(currentFundingContainer);
-                    
-                    const historicalFundingContainer = document.createElement('div');
-                    modalBody.appendChild(historicalFundingContainer);
-
-                    // Call both in parallel to fetch data simultaneously
-                    fetchAndDisplayCurrentFundingInfo(binanceSymbol, currentFundingContainer);
-                    fetchAndDisplayFundingRate(binanceSymbol, historicalFundingContainer);
                 }
-
             } catch (error) {
                 console.error("Lỗi khi lấy dữ liệu sàn:", error);
                 document.getElementById('exchange-list-section').innerHTML = `<div class="p-4 text-center text-red-500">Không thể tải dữ liệu sàn. Vui lòng thử lại.</div>`;
+            }
+
+            // Determine Binance symbol if not found in the list above
+            if (!binanceSymbol && coinSymbol) {
+                 binanceSymbol = `${coinSymbol.toUpperCase()}USDT`;
+            }
+
+            if (binanceSymbol) {
+                const currentFundingContainer = document.createElement('div');
+                modalBody.appendChild(currentFundingContainer);
+                
+                const historicalFundingContainer = document.createElement('div');
+                modalBody.appendChild(historicalFundingContainer);
+
+                fetchAndDisplayCurrentFundingInfo(binanceSymbol, currentFundingContainer);
+                fetchAndDisplayFundingRate(binanceSymbol, historicalFundingContainer);
             }
         }
         
@@ -629,9 +703,10 @@
         });
 
         fundingRateTableBody.addEventListener('click', (event) => {
-            if (event.target.classList.contains('coin-link')) {
+            const link = event.target.closest('.coin-link');
+            if (link) {
                 event.preventDefault();
-                const row = event.target.closest('tr');
+                const row = link.closest('tr');
                 if (row && row.dataset.code) {
                     const { code, symbol, displayName } = row.dataset;
                     fetchAndDisplayExchanges(code, symbol, displayName);
