@@ -262,18 +262,19 @@
                 const fundingRate = (parseFloat(item.lastFundingRate) * 100).toFixed(4);
                 const rateClass = fundingRate >= 0 ? 'price-up' : 'price-down';
                 
-                let symbolCellHtml;
+                let symbolCell;
                 if (coinInfo) {
                     row.dataset.code = coinInfo.code;
                     row.dataset.symbol = coinInfo.symbol;
                     row.dataset.displayName = coinInfo.displayName;
-                    symbolCellHtml = `<td class="px-1 py-2 font-semibold text-gray-800 dark:text-gray-200"><a href="#" class="hover:underline cursor-pointer coin-link">${item.symbol}</a></td>`;
+                    // Make the TD itself clickable for better mobile compatibility
+                    symbolCell = `<td class="px-1 py-2 font-semibold text-gray-800 dark:text-gray-200 hover:underline cursor-pointer coin-link">${item.symbol}</td>`;
                 } else {
-                    symbolCellHtml = `<td class="px-1 py-2 font-semibold text-gray-800 dark:text-gray-200">${item.symbol}</td>`;
+                    symbolCell = `<td class="px-1 py-2 font-semibold text-gray-800 dark:text-gray-200">${item.symbol}</td>`;
                 }
 
                 row.innerHTML = `
-                    ${symbolCellHtml}
+                    ${symbolCell}
                     <td class="px-1 py-2 countdown-timer">--:--:--</td>
                     <td class="px-1 py-2 text-right font-semibold ${rateClass}">${fundingRate}%</td>
                 `;
@@ -457,7 +458,7 @@
 
                 **Tuyên bố miễn trừ trách nhiệm:** Luôn thêm dòng chữ "Lưu ý: Phân tích này chỉ mang tính chất tham khảo, không phải là lời khuyên đầu tư chuyên nghiệp." ở cuối cùng.
                 Giữ câu trả lời bằng tiếng Việt.`;
-            const apiKey = ""; 
+            const apiKey = "AIzaSyBe8WlklvhEx8Bhg2i8CaFXQf0cgpgwDHg"; 
 
             try {
                 const response = await fetch(GEMINI_API_URL + apiKey, {
@@ -746,10 +747,10 @@
         });
 
         fundingRateTableBody.addEventListener('click', (event) => {
-            const link = event.target.closest('.coin-link');
-            if (link) {
+            const cell = event.target.closest('.coin-link');
+            if (cell) {
                 event.preventDefault();
-                const row = link.closest('tr');
+                const row = cell.closest('tr');
                 if (row && row.dataset.code) {
                     const { code, symbol, displayName } = row.dataset;
                     fetchAndDisplayExchanges(code, symbol, displayName);
